@@ -140,6 +140,48 @@ Provides a template prompt to guide an LLM in performing a comprehensive market 
 
 Creates a prompt focused on what's moving specific stocks or the overall market. This prompt guides the LLM to use tools like `find_top_posts` and `fetch_post_details` or `fetch_batch_post_details`.
 
+## Integrating with Firecrawl MCP Server
+
+For enhanced analysis capabilities, especially when dealing with external links found in WSB posts, you can integrate this server with the [Firecrawl MCP Server](https://github.com/mendableai/firecrawl-mcp-server). This allows your LLM agent to not only identify links shared on WSB but also scrape and analyze the content of those linked pages.
+
+### Configuration Example
+
+To use both servers simultaneously in Claude Desktop, modify your `claude_desktop_config.json` to include configurations for both under the `mcpServers` key. Ensure you have the Firecrawl MCP server cloned and set up according to its documentation.
+
+```json
+{
+  "mcpServers": {
+    "wsb-analyst": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/absolute/path/to/wsb-analyst-mcp",
+        "run",
+        "mcp_wsb_server.py"
+      ],
+      "env": {
+        "REDDIT_CLIENT_ID": "your_client_id_here",
+        "REDDIT_CLIENT_SECRET": "your_client_secret_here"
+      }
+    },
+    "firecrawl": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/absolute/path/to/firecrawl-mcp-server", // Adjust path
+        "run",
+        "mcp_firecrawl_server.py"
+      ],
+      "env": {
+        "FIRECRAWL_API_KEY": "your_firecrawl_api_key" // If required by Firecrawl
+      }
+    }
+  }
+}
+```
+
+Remember to replace `/absolute/path/to/...` with the actual paths to your project directories and provide any necessary API keys. Restart Claude Desktop after updating the configuration.
+
 ## License
 
 MIT

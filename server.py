@@ -3,6 +3,7 @@ import os
 import re
 import logging
 import heapq
+import time
 
 import asyncpraw
 from pydantic import BaseModel, Field
@@ -10,6 +11,12 @@ from mcp.server.fastmcp import FastMCP, Context
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# --- Cache Configuration ---
+CACHE_DATA = {}
+CACHE_EXPIRY = {}
+CACHE_TTL = 300  # Cache time-to-live in seconds (5 minutes)
+# --- End Cache Configuration ---
 
 mcp = FastMCP("WSB Analyst", dependencies=["asyncpraw", "pydantic"])
 
@@ -78,7 +85,7 @@ def extract_valid_links(text: str) -> list[str]:
 @mcp.tool()
 async def find_top_posts(min_score: int = 100, min_comments: int = 10, limit: int = 10, excluded_flairs: list[str] = ["Meme", "Shitpost", "Gain", "Loss"], ctx: Context = None) -> dict:
     """
-    Fetch and filter WSB posts based on criteria.
+    Fetch and filter WSB posts based on criteria. Caches results for 5 minutes.
 
     Args:
         min_score: Minimum score (upvotes) required
@@ -89,6 +96,17 @@ async def find_top_posts(min_score: int = 100, min_comments: int = 10, limit: in
     Returns:
         A dictionary with filtered posts data
     """
+    # --- Cache Check ---
+    # Sort flairs to ensure consistent key regardless of order
+    excluded_flairs_tuple = tuple(sorted(excluded_flairs))
+    cache_key = f"find_top_posts:{min_score}:{min_comments}:{limit}:{excluded_flairs_tuple}"
+    current_time = time.time()
+    if cache_key in CACHE_DATA and current_time < CACHE_EXPIRY.get(cache_key, 0):
+        logger.info(f"Cache hit for {cache_key}")
+        return CACHE_DATA[cache_key]
+    logger.info(f"Cache miss for {cache_key}")
+    # --- End Cache Check ---
+
     try:
         if ctx:
             await ctx.report_progress(0, 2)
@@ -140,10 +158,18 @@ async def find_top_posts(min_score: int = 100, min_comments: int = 10, limit: in
             if ctx:
                 await ctx.report_progress(2, 2)
 
-            return {
+            result = {
                 "count": len(top_posts),
                 "posts": top_posts
             }
+
+            # --- Cache Store ---
+            CACHE_DATA[cache_key] = result
+            CACHE_EXPIRY[cache_key] = current_time + CACHE_TTL
+            logger.info(f"Cached result for {cache_key} with TTL {CACHE_TTL}s")
+            # --- End Cache Store ---
+
+            return result
         finally:
             await reddit.close()
     except Exception as e:
@@ -153,7 +179,7 @@ async def find_top_posts(min_score: int = 100, min_comments: int = 10, limit: in
 @mcp.tool()
 async def fetch_post_details(post_id: str, ctx: Context = None) -> dict:
     """
-    Fetch detailed information about a specific WSB post including top comments.
+    Fetch detailed information about a specific WSB post including top comments. Caches results for 5 minutes.
 
     Args:
         post_id: Reddit post ID
@@ -161,6 +187,15 @@ async def fetch_post_details(post_id: str, ctx: Context = None) -> dict:
     Returns:
         Detailed post data including comments and extracted links
     """
+    # --- Cache Check ---
+    cache_key = f"fetch_post_details:{post_id}"
+    current_time = time.time()
+    if cache_key in CACHE_DATA and current_time < CACHE_EXPIRY.get(cache_key, 0):
+        logger.info(f"Cache hit for {cache_key}")
+        return CACHE_DATA[cache_key]
+    logger.info(f"Cache miss for {cache_key}")
+    # --- End Cache Check ---
+
     try:
         if ctx:
             await ctx.report_progress(0, 3)
@@ -211,10 +246,7 @@ async def fetch_post_details(post_id: str, ctx: Context = None) -> dict:
             # Combine all found links
             all_links = list(set(content_links + comment_links))
 
-            if ctx:
-                await ctx.report_progress(3, 3)
-
-            return {
+            result = {
                 "post_id": post_id,
                 "url": f"https://www.reddit.com{submission.permalink}",
                 "title": submission.title,
@@ -225,6 +257,17 @@ async def fetch_post_details(post_id: str, ctx: Context = None) -> dict:
                 "top_comments": comment_data,
                 "extracted_links": all_links
             }
+
+            # --- Cache Store ---
+            CACHE_DATA[cache_key] = result
+            CACHE_EXPIRY[cache_key] = current_time + CACHE_TTL
+            logger.info(f"Cached result for {cache_key} with TTL {CACHE_TTL}s")
+            # --- End Cache Store ---
+
+            if ctx:
+                await ctx.report_progress(3, 3)
+
+            return result
         finally:
             await reddit.close()
     except Exception as e:
