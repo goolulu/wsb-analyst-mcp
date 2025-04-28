@@ -148,10 +148,6 @@ Creates a prompt focused on what's moving specific stocks or the overall market.
 
 For enhanced analysis capabilities, especially when dealing with external links found in WSB posts, you can integrate this server with the [Firecrawl MCP Server](https://github.com/mendableai/firecrawl-mcp-server). This allows your LLM agent to not only identify links shared on WSB but also scrape and analyze the content of those linked pages.
 
-```
-
-Remember to replace `/absolute/path/to/...` with the actual paths to your project directories and provide any necessary API keys. Restart Claude Desktop after updating the configuration.
-
 ## License
 
 MIT
