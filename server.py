@@ -4,6 +4,7 @@ import re
 import logging
 import heapq
 import time
+import httpx
 
 import asyncpraw
 from pydantic import BaseModel, Field
@@ -18,7 +19,7 @@ CACHE_EXPIRY = {}
 CACHE_TTL = 300  # Cache time-to-live in seconds (5 minutes)
 # --- End Cache Configuration ---
 
-mcp = FastMCP("WSB Analyst", dependencies=["asyncpraw", "pydantic"])
+mcp = FastMCP("WSB Analyst", dependencies=["asyncpraw", "pydantic", "httpx"])
 
 class Comment(BaseModel):
     content: str
@@ -68,17 +69,49 @@ def is_valid_external_link(url: str) -> bool:
 def extract_valid_links(text: str) -> list[str]:
     if not text:
         return []
-
     url_pattern = re.compile(
         r'https?://(?!(?:www\.)?reddit\.com|(?:www\.)?i\.redd\.it|(?:www\.)?v\.redd\.it|(?:www\.)?imgur\.com|'
         r'(?:www\.)?preview\.redd\.it|(?:www\.)?sh\.reddit\.com|[^.]*\.reddit\.com)'
         r'[^\s)\]}"\']+',
         re.IGNORECASE
     )
-
     links = url_pattern.findall(text)
     return [link for link in links if is_valid_external_link(link)]
 
+async def filter_valid_tickers(tickers: list[str]) -> list[str]:
+    """Filter out invalid tickers using NASDAQ's symbol list."""
+    async with httpx.AsyncClient() as client:
+        try:
+            nasdaq_response = await client.get("https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt")
+            other_response = await client.get("https://www.nasdaqtrader.com/dynamic/SymDir/otherlisted.txt")
+            nasdaq_response.raise_for_status()
+            other_response.raise_for_status()
+        except httpx.RequestError as e:
+            logger.error(f"Error fetching NASDAQ ticker lists: {e}")
+            return list(set(ticker.upper() for ticker in tickers))
+        except httpx.HTTPStatusError as e:
+             logger.error(f"Error fetching NASDAQ ticker lists (status {e.response.status_code}): {e}")
+             return list(set(ticker.upper() for ticker in tickers))
+
+        valid_symbols = set()
+        try:
+            for line in nasdaq_response.text.splitlines()[1:-1]:  # Skip header and footer
+                parts = line.split('|')
+                if len(parts) > 0:
+                    symbol = parts[0]
+                    valid_symbols.add(symbol)
+
+            for line in other_response.text.splitlines()[1:-1]:  # Skip header and footer
+                 parts = line.split('|')
+                 if len(parts) > 0:
+                    symbol = parts[0]
+                    valid_symbols.add(symbol)
+        except Exception as e:
+            logger.error(f"Error parsing NASDAQ ticker lists: {e}")
+            return list(set(ticker.upper() for ticker in tickers))
+
+    unique_tickers = set(ticker.upper() for ticker in tickers)
+    return [ticker for ticker in unique_tickers if ticker in valid_symbols]
 
 # ---- MCP Tools ----
 
@@ -281,7 +314,6 @@ async def fetch_batch_post_details(post_ids: list[str], ctx: Context = None) -> 
 
     Args:
         post_ids: List of Reddit post IDs
-        ctx: MCP context for progress reporting
 
     Returns:
         Dictionary with details for all requested posts
@@ -317,7 +349,6 @@ async def fetch_detailed_wsb_posts(min_score: int = 100, min_comments: int = 10,
         min_comments: Minimum number of comments required
         limit: Maximum number of posts to return
         excluded_flairs: List of post flairs to exclude. Defaults to ["Meme", "Shitpost", "Gain", "Loss"].
-        ctx: MCP context for progress reporting
 
     Returns:
         A dictionary with detailed data for the filtered posts.
@@ -336,12 +367,14 @@ async def fetch_detailed_wsb_posts(min_score: int = 100, min_comments: int = 10,
 
     if "error" in posts_result:
         logger.error(f"Error during initial post fetch in fetch_detailed_wsb_posts: {posts_result['error']}")
-        if ctx: await ctx.report_progress(3, 3)
+        if ctx:
+            await ctx.report_progress(3, 3)
         return {"error": f"Failed during initial post fetch: {posts_result['error']}"}
 
     if not posts_result["posts"]:
         logger.info("No posts found matching criteria in fetch_detailed_wsb_posts.")
-        if ctx: await ctx.report_progress(3, 3)
+        if ctx:
+            await ctx.report_progress(3, 3)
         return {"count": 0, "posts": {}}
 
     post_ids = [post["id"] for post in posts_result["posts"]]
@@ -365,6 +398,70 @@ async def fetch_detailed_wsb_posts(min_score: int = 100, min_comments: int = 10,
     return details_result # Return the structure from fetch_batch_post_details
 
 @mcp.tool()
+async def get_top_trending_tickers(num_stocks: int = 20, filter: str = "wallstreetbets") -> list[str]:
+    """
+    Fetch top trending stock tickers from ApeWisdom, filtered by valid NASDAQ symbols.
+
+    Args:
+        num_stocks: Number of top stocks to consider based on upvotes and mentions. Defaults to 20.
+        filter: ApeWisdom filter category (e.g., 'wallstreetbets', 'all'). Defaults to 'wallstreetbets'.
+
+    Returns:
+        A list of valid, trending tickers.
+    """
+    api_url = f"https://apewisdom.io/api/v1.0/filter/{filter}"
+    logger.info(f"Fetching trending tickers from {api_url}")
+
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(api_url)
+            response.raise_for_status() # Raise exception for bad status codes
+            data = response.json()
+            logger.info(f"Successfully fetched data from ApeWisdom for filter '{filter}'")
+        except httpx.RequestError as e:
+            logger.error(f"Error fetching from ApeWisdom: {e}")
+            return []
+        except httpx.HTTPStatusError as e:
+             logger.error(f"ApeWisdom API returned error {e.response.status_code}: {e}")
+             return []
+        except Exception as e: # Catch potential JSON decoding errors etc.
+            logger.error(f"An unexpected error occurred fetching/parsing ApeWisdom data: {e}")
+            return []
+
+    if "results" not in data or not isinstance(data["results"], list):
+         logger.error("Invalid data structure received from ApeWisdom API.")
+         return []
+
+    potential_tickers = set()
+    metrics = ["upvotes", "mentions"]
+    for metric in metrics:
+        # Sort by the current metric and take top N
+        # Add try-except for robustness against missing keys or non-numeric values
+        try:
+            sorted_stocks = sorted(
+                [stock for stock in data["results"] if isinstance(stock.get(metric), (int, float))],
+                key=lambda item: item.get(metric, 0),
+                reverse=True
+            )
+            for stock in sorted_stocks[:num_stocks]:
+                 if "ticker" in stock:
+                     potential_tickers.add(stock["ticker"])
+        except Exception as e:
+             logger.warning(f"Could not process metric '{metric}' due to error: {e}")
+
+    if not potential_tickers:
+        logger.info("No potential tickers found after processing ApeWisdom results.")
+        return []
+
+    logger.info(f"Found {len(potential_tickers)} potential tickers, filtering...")
+
+    # Filter valid tickers
+    valid_tickers = await filter_valid_tickers(list(potential_tickers))
+    logger.info(f"Filtered down to {len(valid_tickers)} valid trending tickers.")
+
+    return valid_tickers
+
+@mcp.tool()
 async def get_external_links(min_score: int = 100, min_comments: int = 10, limit: int = 10, ctx: Context = None) -> dict:
     """
     Get all external links from top WSB posts.
@@ -373,7 +470,6 @@ async def get_external_links(min_score: int = 100, min_comments: int = 10, limit
         min_score: Minimum score (upvotes) required
         min_comments: Minimum number of comments required
         limit: Maximum number of posts to scan
-        ctx: MCP context for progress reporting
 
     Returns:
         Dictionary with all unique external links found
@@ -385,36 +481,36 @@ async def get_external_links(min_score: int = 100, min_comments: int = 10, limit
     posts_result = await find_top_posts(min_score, min_comments, limit)
     if "error" in posts_result:
         return {"error": posts_result["error"]}
-        
+
     if len(posts_result["posts"]) == 0:
         return {"count": 0, "links": []}
-    
+
     # Collect post IDs
     post_ids = [post["id"] for post in posts_result["posts"]]
-    
+
     if ctx:
         await ctx.report_progress(1, 3)
-        
+
     # Get details for all posts
     details_result = await fetch_batch_post_details(post_ids)
     if "error" in details_result:
         return {"error": details_result["error"]}
-    
+
     # Extract all links
     all_links = []
     for post_id, post_detail in details_result["posts"].items():
         if "extracted_links" in post_detail:
             all_links.extend(post_detail["extracted_links"])
-    
+
     if ctx:
         await ctx.report_progress(2, 3)
-        
+
     # Remove duplicates and sort
     unique_links = sorted(list(set(all_links)))
-    
+
     if ctx:
         await ctx.report_progress(3, 3)
-    
+
     return {
         "count": len(unique_links),
         "links": unique_links
