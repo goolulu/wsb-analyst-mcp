@@ -1,5 +1,7 @@
 # WSB Analyst MCP Server
 
+[![smithery badge](https://smithery.ai/badge/@ferdousbhai/wsb-analyst-mcp)](https://smithery.ai/server/@ferdousbhai/wsb-analyst-mcp)
+
 A Model Context Protocol (MCP) server that provides real-time WallStreetBets data for analysis with Claude or other LLM clients.
 
 ## Features
@@ -18,6 +20,14 @@ A Model Context Protocol (MCP) server that provides real-time WallStreetBets dat
 - [Claude Desktop](https://claude.ai/download) or another MCP client
 
 ## Installation
+
+### Installing via Smithery
+
+To install WSB Analyst for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@ferdousbhai/wsb-analyst-mcp):
+
+```bash
+npx -y @smithery/cli install @ferdousbhai/wsb-analyst-mcp --client claude
+```
 
 Clone this repository or download the source files:
 
