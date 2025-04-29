@@ -1,0 +1,24 @@
+# Smithery configuration file: https://smithery.ai/docs/config#smitheryyaml
+
+startCommand:
+  type: stdio
+  configSchema:
+    # JSON Schema defining the configuration options for the MCP.
+    type: object
+    required:
+      - redditClientId
+      - redditClientSecret
+    properties:
+      redditClientId:
+        type: string
+        description: Reddit API client ID
+      redditClientSecret:
+        type: string
+        description: Reddit API client secret
+  commandFunction:
+    # A JS function that produces the CLI command based on the given config to start the MCP on stdio.
+    |-
+    (config) => ({ command: 'uv', args: ['--directory', '/app', 'run', 'server.py'], env: { REDDIT_CLIENT_ID: config.redditClientId, REDDIT_CLIENT_SECRET: config.redditClientSecret } })
+  exampleConfig:
+    redditClientId: your_client_id_here
+    redditClientSecret: your_client_secret_here
