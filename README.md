@@ -15,7 +15,7 @@ A Model Context Protocol (MCP) server that provides real-time WallStreetBets dat
 
 ## Requirements
 
-- Python 3.10 or higher
+- Python 3.12 or higher
 - Reddit API credentials
 - [Claude Desktop](https://claude.ai/download) or another MCP client
 
@@ -74,12 +74,10 @@ Add the following configuration (adjust paths as needed):
 {
   "mcpServers": {
     "wsb-analyst": {
-      "command": "uv",
+      "command": "uvx",
       "args": [
-        "--directory",
-        "/absolute/path/to/wsb-analyst-mcp",
         "run",
-        "mcp_wsb_server.py"
+        "wsb-analyst"
       ],
       "env": {
         "REDDIT_CLIENT_ID": "your_client_id_here",

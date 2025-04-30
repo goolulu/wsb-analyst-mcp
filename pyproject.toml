@@ -1,12 +1,35 @@
 [project]
 name = "wsb-analyst"
 version = "0.1.1"
-description = "Add your description here"
+description = "An MCP server providing tools to analyze WallStreetBets (WSB) discussions."
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [
+    {name = "Ferdous", email = "ferdous@hey.com"},
+]
 dependencies = [
     "asyncpraw>=7.8.1",
     "httpx>=0.28.1",
     "mcp[cli]>=1.6.0",
     "pydantic>=2.11.3",
 ]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Topic :: Scientific/Engineering :: Interface Engine/Protocol Translator",
+]
+
+[project.urls]
+Homepage = "https://github.com/ferdousbhai/wsb-analyst-mcp"
+Repository = "https://github.com/ferdousbhai/wsb-analyst-mcp"
+
+[project.scripts]
+wsb-analyst = "server:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"

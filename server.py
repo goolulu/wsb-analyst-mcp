@@ -581,7 +581,9 @@ In your analysis:
 
     return prompt
 
+def main():
+    mcp.run(transport='stdio')
+
 # Run the server
 if __name__ == "__main__":
-    # Run with stdio transport by default
-    mcp.run(transport='stdio')
+    main()
