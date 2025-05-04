@@ -4,6 +4,10 @@
 
 A Model Context Protocol (MCP) server that provides real-time WallStreetBets data for analysis with Claude or other LLM clients.
 
+<a href="https://glama.ai/mcp/servers/@ferdousbhai/wsb-analyst-mcp">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@ferdousbhai/wsb-analyst-mcp/badge" alt="WSB Analyst Server MCP server" />
+</a>
+
 ## Features
 
 - **Fetch WallStreetBets Posts**: Filter posts by score, comment count, and content type
