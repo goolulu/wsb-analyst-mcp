@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/ferdousbhai-wsb-analyst-mcp-badge.png)](https://mseep.ai/app/ferdousbhai-wsb-analyst-mcp)
+
 # WSB Analyst MCP Server
 
 [![smithery badge](https://smithery.ai/badge/@ferdousbhai/wsb-analyst-mcp)](https://smithery.ai/server/@ferdousbhai/wsb-analyst-mcp)
