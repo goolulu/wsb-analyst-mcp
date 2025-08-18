@@ -2,6 +2,7 @@
 
 # WSB Analyst MCP Server
 
+[![Trust Score](https://archestra.ai/mcp-catalog/api/badge/quality/ferdousbhai/wsb-analyst-mcp)](https://archestra.ai/mcp-catalog/ferdousbhai__wsb-analyst-mcp)
 [![smithery badge](https://smithery.ai/badge/@ferdousbhai/wsb-analyst-mcp)](https://smithery.ai/server/@ferdousbhai/wsb-analyst-mcp)
 
 A Model Context Protocol (MCP) server that provides real-time WallStreetBets data for analysis with Claude or other LLM clients.
