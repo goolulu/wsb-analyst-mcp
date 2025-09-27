@@ -661,10 +661,4 @@ def main():
 
 # Run the server
 if __name__ == "__main__":
-    os.environ["REDDIT_CLIENT_ID"] = "he4dCnWhWy2mTBrcPCb02g"
-    os.environ["REDDIT_CLIENT_SECRET"] = "KANViIYhwDUZ5qimP3fzEjQm8yHGiw"
-    result = asyncio.run(
-        find_top_posts(100, 10, 1, ["Meme", "Shitpost", "Gain", "Loss"], None)
-    )
-
-    print(result)
+    main()
