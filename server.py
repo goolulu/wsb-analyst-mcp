@@ -47,11 +47,11 @@ async def get_reddit_client():
     try:
         client_id = os.environ.get("REDDIT_CLIENT_ID")
         client_secret = os.environ.get("REDDIT_CLIENT_SECRET")
+        proxy_url = os.environ.get("PROXY_URL")
 
         if not client_id or not client_secret:
             logger.error("Reddit API credentials not found in environment variables")
             return None
-        proxy_url = "http://127.0.0.1:1080"
         session = aiohttp.ClientSession(proxy=proxy_url)
         return asyncpraw.Reddit(
             client_id=client_id,
